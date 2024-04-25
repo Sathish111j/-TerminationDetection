@@ -22,7 +22,14 @@ func NewGraph() *Graph {
     return &Graph{}
 }
 
-// Method to add an edge
+func NewNode(id int) *Node {
+    return &Node{
+        ID:    id,
+        Edges: []*Edge{},
+    }
+}
+
+
 func (g *Graph) AddEdge(from, to *Node, weight int) {
     edge := &Edge{From: from, To: to, Weight: weight}
     from.Edges = append(from.Edges, edge)

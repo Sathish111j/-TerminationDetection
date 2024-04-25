@@ -2,9 +2,9 @@ package main
 
 import (
     "fmt"
-    "graph/graph.go"
-    "node/node.go"
-    "termination/detection.go"
+    "DS_case_study/graph"
+    "DS_case_study/node"
+    "DS_case_study/termination"
     "time"
 )
 
@@ -13,9 +13,9 @@ func main() {
     
     // Initialize the graph
     g := graph.NewGraph()
-    g.Initialize()  // Assuming Initialize sets up nodes and edges
+    g.Initialize()
 
-    // Create a few nodes
+    // Create and add a few nodes
     n1 := node.NewNode(1)
     n2 := node.NewNode(2)
     n3 := node.NewNode(3)

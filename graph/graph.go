@@ -67,6 +67,10 @@ func (uf *UnionFind) find(n int) int {
     }
     return uf.parent[n]
 }
+// AddNode adds a new node to the graph.
+func (g *Graph) AddNode(node *Node) {
+    g.Nodes = append(g.Nodes, node)
+}
 
 func (uf *UnionFind) union(x, y int) {
     rootX := uf.find(x)

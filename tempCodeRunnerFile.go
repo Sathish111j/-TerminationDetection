@@ -3,22 +3,19 @@ package main
 import (
   "fmt"
   "sync"
-  
+  "time"
   "DS_case_study/graph"
   "DS_case_study/termination"
 )
 
 func simulateNodeProcessing(node *graph.Node) {
-    fmt.Printf("Node %d starting processing.\n", node.ID)
-    // Mock processing logic (doesn't take any time)
-    for i := 0; i < 1000; i++ { // Simulate some work, but doesn't take actual time
-      _ = i * i
-    }
-    fmt.Printf("Node %d finished processing.\n", node.ID)
-    node.Completed = true
-    close(node.TaskCompleted)
-  }
-  
+  fmt.Printf("Node %d starting processing.\n", node.ID)
+  // Replace with your actual node processing logic
+  time.Sleep(time.Duration(node.ID) * time.Second) // Simulate varying processing times
+  fmt.Printf("Node %d finished processing.\n", node.ID)
+  node.Completed = true  // Set the completion flag
+  close(node.TaskCompleted) // Still close the channel for potential future use
+}
 
 func main() {
   g := graph.NewGraph()

@@ -1,55 +1,48 @@
 package termination
 
 import (
-    "fmt"
-    "sync"
+  "fmt"
+  "sync"
+  "DS_case_study/graph"
+  "time"
 )
 
 type Detector struct {
-    activeCount int
-    lock        sync.Mutex
+  wg sync.WaitGroup
+  done chan bool
 }
 
-// NewDetector creates a new Detector instance
 func NewDetector() *Detector {
-    return &Detector{}
+  return &Detector{done: make(chan bool)}
 }
 
-// RegisterActive is called when a node becomes active
-func (d *Detector) RegisterActive() {
-    d.lock.Lock()
-    defer d.lock.Unlock()
-    d.activeCount++
-    fmt.Println("Node became active, total active:", d.activeCount)
-}
-
-// RegisterInactive is called when a node becomes inactive
-func (d *Detector) RegisterInactive() {
-    d.lock.Lock()
-    defer d.lock.Unlock()
-    if d.activeCount > 0 {
-        d.activeCount--
+func (d *Detector) PropagateCompletion(n *graph.Node) {
+  fmt.Printf("Node %d checking children completion.\n", n.ID)
+  for _, child := range n.Children {
+    if !child.Completed { // Check the completion flag before channel operation
+      d.wg.Add(1)
+      go func(c *graph.Node) {
+        defer d.wg.Done()
+        d.PropagateCompletion(c) // Recursive call to check child completion
+      }(child)
     }
-    fmt.Println("Node became inactive, total active:", d.activeCount)
+  }
+  // Wait for all goroutines spawned for child completion checks to finish
+  d.wg.Wait()
 }
 
-// CheckTermination checks if all nodes are inactive
-func (d *Detector) CheckTermination() bool {
-    d.lock.Lock()
-    defer d.lock.Unlock()
-    if d.activeCount == 0 {
-        fmt.Println("All nodes are inactive. System has terminated.")
-        return true
-    } else {
-        fmt.Println("System not terminated. Active nodes remaining:", d.activeCount)
-        return false
-    }
-}
-
-// Reset allows resetting the detector's count (useful for tests or reinitializations)
-func (d *Detector) Reset() {
-    d.lock.Lock()
-    defer d.lock.Unlock()
-    d.activeCount = 0
-    fmt.Println("Detector reset. Active count is now zero.")
+func (d *Detector) CheckTermination(root *graph.Node) bool {
+  d.wg.Add(1)
+  go func() {
+    defer d.wg.Done()
+    d.PropagateCompletion(root)
+    close(d.done) // Signal completion of all checks
+  }()
+  select {
+  case <-d.done:
+    return true
+  case <-time.After(time.Minute * 5): // Increased timeout for debugging
+    fmt.Println("Termination check timed out.")
+    return false
+  }
 }

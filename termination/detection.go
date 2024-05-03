@@ -1,48 +1,48 @@
 package termination
 
 import (
-  "fmt"
-  "sync"
-  "DS_case_study/graph"
-  "time"
+    "fmt"
+    "sync"
+    "DS_case_study/graph"
 )
 
 type Detector struct {
-  wg sync.WaitGroup
-  done chan bool
+    wg sync.WaitGroup
 }
 
 func NewDetector() *Detector {
-  return &Detector{done: make(chan bool)}
+    return &Detector{}
+}
+
+func safeClose(ch chan struct{}) {
+    defer func() {
+        if recover() != nil {
+            fmt.Println("Recovered from closing closed channel.")
+        }
+    }()
+    close(ch)
 }
 
 func (d *Detector) PropagateCompletion(n *graph.Node) {
-  fmt.Printf("Node %d checking children completion.\n", n.ID)
-  for _, child := range n.Children {
-    if !child.Completed { // Check the completion flag before channel operation
-      d.wg.Add(1)
-      go func(c *graph.Node) {
-        defer d.wg.Done()
-        d.PropagateCompletion(c) // Recursive call to check child completion
-      }(child)
+    fmt.Printf("Node %d checking children completion.\n", n.ID)
+    for _, child := range n.Children {
+        <-child.TaskCompleted // Wait for the task completed signal from the child
+        d.PropagateCompletion(child) // Recursive call to check child completion
     }
-  }
-  // Wait for all goroutines spawned for child completion checks to finish
-  d.wg.Wait()
+    n.Mutex.Lock()
+    if !n.Completed {
+        n.Completed = true // Mark as completed
+        safeClose(n.TaskCompleted) // Safely close the channel
+    }
+    n.Mutex.Unlock()
 }
 
 func (d *Detector) CheckTermination(root *graph.Node) bool {
-  d.wg.Add(1)
-  go func() {
-    defer d.wg.Done()
-    d.PropagateCompletion(root)
-    close(d.done) // Signal completion of all checks
-  }()
-  select {
-  case <-d.done:
+    d.wg.Add(1)
+    go func() {
+        defer d.wg.Done()
+        d.PropagateCompletion(root)
+    }()
+    d.wg.Wait() // Wait for all checks to complete
     return true
-  case <-time.After(time.Minute * 5): // Increased timeout for debugging
-    fmt.Println("Termination check timed out.")
-    return false
-  }
 }

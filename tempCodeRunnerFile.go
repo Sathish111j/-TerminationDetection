@@ -20,6 +20,10 @@ func simulateNodeProcessing(node *graph.Node) {
 func main() {
   g := graph.NewGraph()
   g.Initialize()
+  
+  
+  g.AddEdge(g.Nodes[4], g.Nodes[1], 10)  
+
   g.BuildMST()
 
   detector := termination.NewDetector()

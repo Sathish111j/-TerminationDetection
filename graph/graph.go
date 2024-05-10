@@ -13,10 +13,12 @@ type Node struct {
     Children  []*Node
     Parent    *Node
     Completed bool
+    IsLeaf    bool   // Indicator if the node is a leaf
     Mutex     sync.Mutex
     Color     string
     Token     *Token
 }
+
 
 type Token struct {
     Color string
@@ -185,21 +187,55 @@ func (n *Node) propagateToken() {
         return
     }
 
+    // Start with the assumption that the token is white
     tokenColor := "white"
-    if n.Color == "black" {
+
+    // Check if this node or any of its descendants propagate a black token
+    if n.Color == "black" || anyDescendantHasBlackToken(n) {
         tokenColor = "black"
     }
 
+    // Lock the parent to safely update its token
     n.Parent.Mutex.Lock()
+    defer n.Parent.Mutex.Unlock()
     if n.Parent.Token == nil {
         n.Parent.Token = &Token{Color: tokenColor}
     } else if tokenColor == "black" {
         n.Parent.Token.Color = "black"
     }
-    n.Parent.Mutex.Unlock()
 
+    // Reset the current node's token and color after propagating
     n.Color = "white"
     n.Token = nil
+}
+
+// Checks recursively if any child or the node itself has a black token or color
+func anyDescendantHasBlackToken(node *Node) bool {
+    if node.Color == "black" {
+        return true
+    }
+    for _, child := range node.Children {
+        child.Mutex.Lock()
+        defer child.Mutex.Unlock()
+        if child.Token != nil && child.Token.Color == "black" {
+            return true
+        }
+        if anyDescendantHasBlackToken(child) {
+            return true
+        }
+    }
+    return false
+}
+
+func allChildrenCompleted(node *Node) bool {
+    for _, child := range node.Children {
+        child.Mutex.Lock()
+        defer child.Mutex.Unlock()
+        if !child.Completed || child.Token != nil {
+            return false
+        }
+    }
+    return true
 }
 
 func sendRepeatSignal(g *Graph) {
@@ -213,16 +249,6 @@ func sendRepeatSignal(g *Graph) {
     }
 }
 
-func allChildrenCompleted(node *Node) bool {
-    for _, child := range node.Children {
-        child.Mutex.Lock()
-        defer child.Mutex.Unlock()
-        if !child.Completed || child.Token != nil {
-            return false
-        }
-    }
-    return true
-}
 
 func PrintTree(node *Node, prefix string, isTail bool) {
     if node == nil {
@@ -242,4 +268,15 @@ func PrintTree(node *Node, prefix string, isTail bool) {
             PrintTree(child, prefix+"│   ", i == len(node.Children)-1)
         }
     }
+}
+func (g *Graph) PrintBlackNodes() {
+    fmt.Println("Current list of black nodes:")
+    for _, node := range g.Nodes {
+        node.Mutex.Lock()
+        if node.Color == "black" {
+            fmt.Printf("Node %d is black.\n", node.ID)
+        }
+        node.Mutex.Unlock()
+    }
+    fmt.Println()
 }

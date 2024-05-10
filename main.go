@@ -5,10 +5,10 @@ import (
     "math/rand"
     "sync"
     "time"
-    "DS_case_study/graph" // Update this import path to where your graph package is located
+    "DS_case_study/graph" // Make sure this import path matches your project structure
 )
 
-func simulateNodeProcessing(node *graph.Node, wg *sync.WaitGroup) {
+func simulateNodeProcessing(node *graph.Node, wg *sync.WaitGroup, g *graph.Graph) {
     defer wg.Done()
     fmt.Printf("Node %d starting processing.\n", node.ID)
 
@@ -23,6 +23,7 @@ func simulateNodeProcessing(node *graph.Node, wg *sync.WaitGroup) {
     if rand.Intn(2) == 0 {
         node.Mutex.Lock()
         node.Color = "black"
+        fmt.Printf("Node %d turns black due to its own processing logic.\n", node.ID)
         node.Mutex.Unlock()
 
         // Randomly select a neighbor to send a message
@@ -35,17 +36,23 @@ func simulateNodeProcessing(node *graph.Node, wg *sync.WaitGroup) {
         if len(neighbors) > 0 {
             target := neighbors[rand.Intn(len(neighbors))]
             fmt.Printf("Node %d sending message to Node %d.\n", node.ID, target.ID)
-            // Simulating message effect on target
             target.Mutex.Lock()
             if target.Color == "white" {
                 target.Color = "black" // Change target's color to black on receiving a message
+                fmt.Printf("Node %d turns black upon receiving a message from Node %d.\n", target.ID, node.ID)
             }
             target.Mutex.Unlock()
         }
     }
 
+    // Print the list of black nodes after the message passing logic
+    println(" ")
+    g.PrintBlackNodes()
+    println(" ")
+
     fmt.Printf("Node %d finished processing.\n", node.ID)
 }
+
 
 func main() {
     g := graph.NewGraph()
@@ -55,15 +62,12 @@ func main() {
     var wg sync.WaitGroup
     for _, node := range g.Nodes {
         wg.Add(1)
-        go simulateNodeProcessing(node, &wg)
+        go simulateNodeProcessing(node, &wg, g)
     }
 
     wg.Wait()
 
-    // Print the tree after building the MST and simulating processing
-    fmt.Println("Minimum Spanning Tree:")
-    graph.PrintTree(g.RootNode, "", true)
-    fmt.Println()
+    fmt.Println("Simulation complete. Final state of the graph:")
 
     if g.DetectTermination() {
         fmt.Println("Termination detected.")

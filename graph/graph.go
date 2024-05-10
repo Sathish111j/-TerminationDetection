@@ -1,4 +1,3 @@
-// graph package
 package graph
 
 import (
@@ -7,7 +6,7 @@ import (
     "sync"
 )
 
-// Node struct
+// Node struct enhanced with repeat signal handling and token tracking
 type Node struct {
     ID        int
     Edges     []*Edge
@@ -15,44 +14,38 @@ type Node struct {
     Parent    *Node
     Completed bool
     Mutex     sync.Mutex
+    Color     string
+    Token     *Token
 }
 
-// Edge struct
+type Token struct {
+    Color string
+}
+
 type Edge struct {
     From   *Node
     To     *Node
     Weight int
 }
 
-// Graph struct
 type Graph struct {
     Nodes    []*Node
     Edges    []*Edge
     RootNode *Node
+    SetS     map[int]*Node // Map to track nodes with tokens
 }
 
-// NewGraph constructor
 func NewGraph() *Graph {
-    return &Graph{}
+    return &Graph{
+        SetS: make(map[int]*Node),
+    }
 }
 
-// NewNode constructor
 func NewNode(id int) *Node {
     return &Node{
-        ID: id,
+        ID:    id,
+        Color: "white",
     }
-}
-
-// AddEdge method
-func (g *Graph) AddEdge(from, to *Node, weight int) error {
-    if from == nil || to == nil {
-        return fmt.Errorf("cannot add edge with nil from or to node")
-    }
-    edge := &Edge{From: from, To: to, Weight: weight}
-    from.Edges = append(from.Edges, edge)
-    to.Edges = append(to.Edges, edge)
-    g.Edges = append(g.Edges, edge)
-    return nil
 }
 
 // Initialize graph with nodes and edges
@@ -77,6 +70,19 @@ func (g *Graph) Initialize() {
     g.AddEdge(g.Nodes[8], g.Nodes[9], 10)
 }
 
+
+// Enhanced edge adding and token propagation logic
+func (g *Graph) AddEdge(from, to *Node, weight int) error {
+    if from == nil || to == nil {
+        return fmt.Errorf("cannot add edge with nil from or to node")
+    }
+    edge := &Edge{From: from, To: to, Weight: weight}
+    from.Edges = append(from.Edges, edge)
+    to.Edges = append(to.Edges, edge)
+    g.Edges = append(g.Edges, edge)
+    return nil
+}
+
 func (g *Graph) BuildMST() {
     sort.Slice(g.Edges, func(i, j int) bool {
         return g.Edges[i].Weight < g.Edges[j].Weight
@@ -89,7 +95,6 @@ func (g *Graph) BuildMST() {
         }
     }
 }
-
 
 // UnionFind struct for MST construction
 type UnionFind struct {
@@ -131,4 +136,110 @@ func (uf *UnionFind) union(x, y int) bool {
         return true
     }
     return false
+}
+
+func (g *Graph) DetectTermination() bool {
+    for {
+        fmt.Println("Current state of the tree:")
+        PrintTree(g.RootNode, "", true)
+        fmt.Println()
+
+        rootReady := true
+        for _, node := range g.Nodes {
+            node.Mutex.Lock()
+            if node.Token != nil {
+                g.SetS[node.ID] = node // Track nodes with tokens
+            }
+            if len(node.Children) == 0 && node.Completed {
+                node.propagateToken()
+            } else if node.Completed && allChildrenCompleted(node) {
+                node.propagateToken()
+            }
+            if node == g.RootNode && node.Token != nil && node.Token.Color == "black" {
+                rootReady = false
+            }
+            node.Mutex.Unlock()
+        }
+
+        if rootReady && g.RootNode.Token != nil {
+            if g.RootNode.Token.Color == "white" {
+                return true
+            }
+        }
+
+        if !rootReady {
+            sendRepeatSignal(g) // Send repeat signal if black token is received
+            for _, node := range g.Nodes {
+                node.Mutex.Lock()
+                node.Token = nil
+                node.Color = "white"
+                node.Mutex.Unlock()
+            }
+            g.SetS = make(map[int]*Node) // Reset the set S
+        }
+    }
+}
+
+func (n *Node) propagateToken() {
+    if n.Parent == nil {
+        return
+    }
+
+    tokenColor := "white"
+    if n.Color == "black" {
+        tokenColor = "black"
+    }
+
+    n.Parent.Mutex.Lock()
+    if n.Parent.Token == nil {
+        n.Parent.Token = &Token{Color: tokenColor}
+    } else if tokenColor == "black" {
+        n.Parent.Token.Color = "black"
+    }
+    n.Parent.Mutex.Unlock()
+
+    n.Color = "white"
+    n.Token = nil
+}
+
+func sendRepeatSignal(g *Graph) {
+    fmt.Println("Sending repeat signal from root...")
+    for _, node := range g.Nodes {
+        node.Mutex.Lock()
+        if node.Token == nil {
+            node.Token = &Token{Color: "white"} // Initiate with white token
+        }
+        node.Mutex.Unlock()
+    }
+}
+
+func allChildrenCompleted(node *Node) bool {
+    for _, child := range node.Children {
+        child.Mutex.Lock()
+        defer child.Mutex.Unlock()
+        if !child.Completed || child.Token != nil {
+            return false
+        }
+    }
+    return true
+}
+
+func PrintTree(node *Node, prefix string, isTail bool) {
+    if node == nil {
+        return
+    }
+    linePrefix := prefix
+    if isTail {
+        linePrefix += "└── "
+    } else {
+        linePrefix += "├── "
+    }
+    fmt.Println(linePrefix + fmt.Sprintf("Node %d (Color: %s, Token: %v)", node.ID, node.Color, node.Token))
+    for i, child := range node.Children {
+        if isTail {
+            PrintTree(child, prefix+"    ", i == len(node.Children)-1)
+        } else {
+            PrintTree(child, prefix+"│   ", i == len(node.Children)-1)
+        }
+    }
 }

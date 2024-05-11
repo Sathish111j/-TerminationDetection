@@ -5,7 +5,7 @@ import (
     "math/rand"
     "sync"
     "time"
-    "DS_case_study/graph" // Make sure this import path matches your project structure
+    "DS_case_study/graph" 
 )
 
 func simulateNodeProcessing(node *graph.Node, wg *sync.WaitGroup, g *graph.Graph) {
@@ -45,14 +45,8 @@ func simulateNodeProcessing(node *graph.Node, wg *sync.WaitGroup, g *graph.Graph
         }
     }
 
-    // Print the list of black nodes after the message passing logic
-    println(" ")
-    g.PrintBlackNodes()
-    println(" ")
-
     fmt.Printf("Node %d finished processing.\n", node.ID)
 }
-
 
 func main() {
     g := graph.NewGraph()
@@ -65,10 +59,12 @@ func main() {
         go simulateNodeProcessing(node, &wg, g)
     }
 
-    wg.Wait()
+    wg.Wait() // Wait for all nodes to finish processing
+
+    // Print the list of black nodes after all message passing is completed
+    g.PrintBlackNodes()
 
     fmt.Println("Simulation complete. Final state of the graph:")
-
     if g.DetectTermination() {
         fmt.Println("Termination detected.")
     } else {
